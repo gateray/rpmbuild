@@ -1,0 +1,80 @@
+Name:       MySQL
+Version:    5.6.29    
+Release:    1%{?dist}
+Summary:    MySQL-5.6.29 RPM
+
+Group:      applications/database
+License:    GPL    
+URL:        http://www.mysql.com    
+Source0:    mysql-5.6.29.tar.gz
+BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+BuildRequires:  cmake
+
+AutoReqProv: no
+%description
+MySQL 5.6.29
+
+%define MYSQL_USER mysql
+%define MYSQL_GROUP mysql
+
+%prep
+%setup -n mysql-%{version}
+
+%build
+cmake \
+-DCMAKE_INSTALL_PREFIX=/home/mysql/mysql-5.6.29 \
+-DMYSQL_DATADIR=/data \
+-DSYSCONFDIR=/etc \
+-DWITH_MYISAM_STORAGE_ENGINE=1 \
+-DWITH_INNOBASE_STORAGE_ENGINE=1 \
+-DWITH_MEMORY_STORAGE_ENGINE=1 \
+-DWITH_READLINE=1 \
+-DMYSQL_UNIX_ADDR=/data/mysql.sock \
+-DMYSQL_TCP_PORT=3306 \
+-DENABLED_LOCAL_INFILE=1 \
+-DWITH_PARTITION_STORAGE_ENGINE=1 \
+-DEXTRA_CHARSETS=all \
+-DDEFAULT_CHARSET=utf8 \
+-DDEFAULT_COLLATION=utf8_general_ci
+make -j `cat /proc/cpuinfo | grep processor| wc -l`
+
+
+%install
+rm -rf %{buildroot}
+make install DESTDIR=%{buildroot}
+
+
+%pre
+mkdir -p /data
+if [ -z `id -u mysql 2>/dev/null` ]; then
+    useradd -m -s /bin/bash mysql
+fi
+chown -R mysql:mysql /data
+
+
+%post
+/home/mysql/mysql-5.6.29/scripts/mysql_install_db --basedir=/home/mysql/mysql-5.6.29 --datadir=/data --user=mysql
+cp /home/mysql/mysql-5.6.29/support-files/mysql.server /etc/init.d/mysql
+chkconfig mysql on
+service mysql start
+echo "export PATH=.:$PATH:/home/mysql/mysql-5.6.29/bin;" >> /home/mysql/.bashrc
+source /home/mysql/.bashrc
+
+%preun
+service mysql stop
+chkconfig --del mysql
+userdel mysql
+rm -rf /home/mysql
+rm -rf /data
+rm -rf /etc/init.d/mysql
+
+%clean
+rm -rf %{buildroot}
+
+
+%files
+%defattr(-, %{MYSQL_USER}, %{MYSQL_GROUP})
+%attr(755, %{MYSQL_USER}, %{MYSQL_GROUP}) /home/mysql/mysql-5.6.29/*
+
+
+%changelog
